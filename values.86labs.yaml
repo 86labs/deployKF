@@ -1,0 +1,116 @@
+argocd:
+  project: infra
+
+deploykf_dependencies:
+  cert_manager:
+    enabled: false
+  istio:
+    enabled: false
+  kyverno:
+    enabled: true
+    namespace: kyverno
+
+# Deploy KF Core
+deploykf_core:
+  deploykf_auth:
+    dex:
+      envVars:
+      - name: OIDC_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: dex-sso-secret
+            key: OIDC_CLIENT_ID
+      - name: OIDC_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: dex-sso-secret
+            key: OIDC_CLIENT_SECRET
+      config:
+        issuer: kubeflow.86labs.cloud
+        storage:
+          type: kubernetes
+          config:
+            inCluster: true
+        web:
+          http: 0.0.0.0:5556
+        logger:
+          level: "debug"
+          format: text
+        oauth2:
+          skipApprovalScreen: true
+        enablePasswordDB: false
+        # staticPasswords:
+        # - email: user@example.com
+        #   hashFromEnv: DEX_USER_PASSWORD
+        #   username: user
+        #   userID: "15841185641784"
+        staticClients:
+        - idEnv: OIDC_CLIENT_ID
+          redirectURIs: ["/oauth2/callback"]
+          name: 'Dex Login Application'
+          secretEnv: OIDC_CLIENT_SECRET
+        connectors:
+        - type: oidc
+          id: keycloak
+          name: keycloak
+          config:
+            issuer: https://sso.86labs.cloud/auth/realms/metal
+            clientID: kubeflow.86labs.cloud
+            redirectURI: https://kubeflow.86labs.cloud/dex/callback
+            insecure: false
+            insecureSkipEmailVerified: true
+            userNameKey: email
+            scopes:
+              - openid
+              - profile
+              - email
+              - offline_access
+  deploykf_istio_gateway:
+    gateway:
+      hostname: kubeflow.86labs.cloud
+    gatewayService:
+      name: "deploykf-gateway"
+      type: "LoadBalancer"
+      annotations:
+        external-dns.alpha.kubernetes.io/hostname: kubeflow.86labs.cloud
+# Deploy KF Optional
+deploykf_opt:
+  # we use ceph or apache ozone for the s3 api
+  deploykf_minio:
+    enabled: false
+  deploykf_mysql:
+    enabled: false
+
+kubeflow_dependencies:
+
+  ## --------------------------------------
+  ##        kubeflow-argo-workflows
+  ## --------------------------------------
+  kubeflow_argo_workflows:
+    enabled: true
+    namespace: kubeflow-argo-workflows
+
+kubeflow_tools:
+  pipelines:
+    objectStore:
+      useExternal: true
+      host: s3.86labs.cloud
+      useSSL: true
+      auth:
+        existingSecret: "pipelines-s3-kubeflow-secret"
+        existingSecretAccessKeyKey: "AWS_ACCESS_KEY_ID"
+        existingSecretSecretKeyKey: "AWS_SECRET_ACCESS_KEY"
+    mysql:
+      useExternal: true
+      host: "kubeflow.kubeflow-mysql.svc.cluster.local"
+      port: 3306
+      auth:
+        existingSecret: "mysql-kubeflow-secret"
+        existingSecretUsernameKey: "username"
+        existingSecretPasswordKey: "password"
+      ## mysql database names
+      ##
+    mysqlDatabases:
+      cacheDatabase: kfp_cache
+      metadataDatabase: kfp_metadata
+      pipelinesDatabase: kfp_pipelines
