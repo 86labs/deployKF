@@ -20,7 +20,7 @@ argocd:
       ##  - for example, if you are using a folder named 'GENERATOR_OUTPUT' at the root of your repo,
       ##    you might set this value to "./GENERATOR_OUTPUT/"
       ##
-      path: ""
+      path: "./output"
 
   ## the destination used for deployKF argocd applications
   ##  - the value of `destination.name` takes precedence over `destination.server`
